@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const { google } = require('googleapis');
 const dotenv = require('dotenv');
 const dayjs = require('dayjs');
