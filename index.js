@@ -32,6 +32,14 @@ app.get('/auth/google', (req, res) => {
   res.redirect(authUrl);
 });
 
+app.get('/test', (req, res) => {
+  console.log('alive!!')
+  res.send({
+    status:200,
+    msg : "we are up!!"
+  })
+});
+
 // Step 2: Handle OAuth callback
 app.get('/auth/google/callback', async (req, res) => {
   const code = req.query.code;
