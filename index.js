@@ -30,7 +30,9 @@ const SCOPES = [
   'https://www.googleapis.com/auth/fitness.activity.read',
   'https://www.googleapis.com/auth/fitness.body.read',
 ];
-
+app.get('/',(req,res)=>{
+  res.send("msg: at home");
+})
 // Step 1: Start Google OAuth
 app.get('/auth/google', (req, res) => {
   const authUrl = oAuth2Client.generateAuthUrl({
