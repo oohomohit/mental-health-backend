@@ -7,6 +7,14 @@ dotenv.config();
 const app = express();
 const port = 3000;
 
+
+app.use(cors({
+  origin: '*'  // Replace with the frontend URL
+}));
+app.use(express.json()); // For JSON body parsing
+app.use(express.urlencoded({ extended: true })); // For URL-encoded body parsing
+
+
 // Google OAuth2 client setup
 const oAuth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
