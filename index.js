@@ -78,7 +78,18 @@ app.get('/auth/google/callback', async (req, res) => {
     req.session.tokens = tokens;
     global.oauthTokens = tokens;
 
-    res.send('Authentication successful! Now go to /heart-rate to fetch data.');
+    res.send(`
+      <h2>✅ Authentication successful!</h2>
+      <p>Click any endpoint below to test:</p>
+      <ul>
+        <li><a href="/heart-rate" target="_blank">💓 Heart Rate</a></li>
+        <li><a href="/sleep-duration" target="_blank">🛌 Sleep Duration</a></li>
+        <li><a href="/steps-count" target="_blank">👣 Steps Count</a></li>
+        <li><a href="/oxygen-saturation" target="_blank">🫁 Oxygen Saturation</a></li>
+        <li><a href="/physical-activity" target="_blank">🏃 Physical Activity</a></li>
+        <li><a href="/temperature" target="_blank">🌡️ Temperature</a></li>
+      </ul>
+    `);
   } catch (err) {
     console.error('Error getting tokens:', err);
     res.status(500).send('Authentication failed');
