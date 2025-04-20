@@ -83,11 +83,11 @@ app.get('/auth/google/callback', async (req, res) => {
       <p>Click any endpoint below to test:</p>
       <ul>
         <li><a href="/heart-rate" target="_blank">💓 Heart Rate</a></li>
-        <li><a href="/sleep-duration" target="_blank">🛌 Sleep Duration</a></li>
-        <li><a href="/steps-count" target="_blank">👣 Steps Count</a></li>
+        <li><a href="/sleep" target="_blank">🛌 Sleep Duration</a></li>
+        <li><a href="/steps" target="_blank">👣 Steps Count</a></li>
         <li><a href="/oxygen-saturation" target="_blank">🫁 Oxygen Saturation</a></li>
-        <li><a href="/physical-activity" target="_blank">🏃 Physical Activity</a></li>
-        <li><a href="/temperature" target="_blank">🌡️ Temperature</a></li>
+        <li><a href="/activity" target="_blank">🏃 Physical Activity</a></li>
+        <li><a href="/body-temperature" target="_blank">🌡️ Temperature</a></li>
       </ul>
     `);
   } catch (err) {
