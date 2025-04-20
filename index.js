@@ -30,9 +30,12 @@ const SCOPES = [
   'https://www.googleapis.com/auth/fitness.activity.read',
   'https://www.googleapis.com/auth/fitness.body.read',
 ];
+
+//home route
 app.get('/',(req,res)=>{
   res.send("msg: at home");
 })
+
 // Step 1: Start Google OAuth
 app.get('/auth/google', (req, res) => {
   const authUrl = oAuth2Client.generateAuthUrl({
@@ -97,6 +100,139 @@ app.get('/heart-rate', async (req, res) => {
   } catch (error) {
     console.error('Failed to fetch heart rate:', error);
     res.status(500).send('Failed to fetch heart rate');
+  }
+});
+
+// Step 4: Fetch Sleep Duration data
+app.get('/sleep', async (req, res) => {
+  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(global.oauthTokens);
+
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  try {
+    const response = await fitness.users.sessions.list({
+      userId: 'me',
+      startTime: new Date(startTime / 1_000_000).toISOString(),
+      endTime: new Date(endTime / 1_000_000).toISOString(),
+    });
+
+    const sleepSessions = response.data.session?.filter(s => s.activityType === 72); // 72 is sleep
+    res.json(sleepSessions || []);
+  } catch (error) {
+    console.error('Failed to fetch sleep:', error);
+    res.status(500).send('Failed to fetch sleep data');
+  }
+});
+
+// Step 5: Fetch Step Count Data
+app.get('/steps', async (req, res) => {
+  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(global.oauthTokens);
+
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Failed to fetch steps:', error);
+    res.status(500).send('Failed to fetch steps');
+  }
+});
+
+// Step 6: Fetch Physical Activity Data
+app.get('/activity', async (req, res) => {
+  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(global.oauthTokens);
+
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.activity.segment:com.google.android.gms:merge_activity_segments';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Failed to fetch activity:', error);
+    res.status(500).send('Failed to fetch activity data');
+  }
+});
+
+// Step 7: Fetch Breathing Rate/ Oxygen Saturation Data
+app.get('/oxygen-saturation', async (req, res) => {
+  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(global.oauthTokens);
+
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.oxygen_saturation:com.google.android.gms:merge_oxygen_saturation';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Failed to fetch oxygen saturation:', error);
+    res.status(500).send('Failed to fetch oxygen saturation');
+  }
+});
+
+// Step 8: Fetch Body Temperature Data
+app.get('/body-temperature', async (req, res) => {
+  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(global.oauthTokens);
+
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.body.temperature:com.google.android.gms:merge_body_temperature';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Failed to fetch body temperature:', error);
+    res.status(500).send('Failed to fetch body temperature');
   }
 });
 
