@@ -427,11 +427,11 @@ app.get('/body-temperature', authCheck, async (req, res) => {
 // Dashboard
 app.get('/dashboard', authCheck, async (req, res) => {
   try {
-    const heartRateData = await getHeartRateData();
-    const sleepData = await getSleepData();
-    const stepsData = await getStepsData();
-    const oxygenData = await getOxygenSaturationData();
-    const temperatureData = await getTemperatureData();
+    const heartRateData = await getHeartRateData().catch(e => { throw new Error("Heart Rate: " + e.message) });
+    const sleepData = await getSleepData().catch(e => { throw new Error("Sleep: " + e.message) });
+    const stepsData = await getStepsData().catch(e => { throw new Error("Steps: " + e.message) });
+    const oxygenData = await getOxygenSaturationData().catch(e => { throw new Error("Oxygen: " + e.message) });
+    const temperatureData = await getTemperatureData().catch(e => { throw new Error("Temperature: " + e.message) });
 
     const dashboardData = {
       heartRateAvg: heartRateData.average,
@@ -463,8 +463,8 @@ app.get('/dashboard', authCheck, async (req, res) => {
 
     res.send(html);
   } catch (error) {
-    console.error('Failed to fetch dashboard data:', error);
-    res.status(500).send('Failed to fetch dashboard data');
+    console.error('[💥 DASHBOARD ERROR]:', error.message);
+    res.status(500).send('Failed to fetch dashboard data: ' + error.message);
   }
 });
 
