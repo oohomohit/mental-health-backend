@@ -3,6 +3,7 @@ const cors = require('cors');
 const { google } = require('googleapis');
 const dotenv = require('dotenv');
 const dayjs = require('dayjs');
+const session = require('express-session');
 
 dotenv.config();
 const app = express();
@@ -14,7 +15,11 @@ app.use(cors({
 }));
 app.use(express.json()); // For JSON body parsing
 app.use(express.urlencoded({ extended: true })); // For URL-encoded body parsing
-
+app.use(session({
+  secret: 'mental-health-secret',
+  resave: false,
+  saveUninitialized: true,
+}));
 
 // Google OAuth2 client setup
 const oAuth2Client = new google.auth.OAuth2(
@@ -31,10 +36,26 @@ const SCOPES = [
   'https://www.googleapis.com/auth/fitness.body.read',
 ];
 
+
+function authCheck(req, res, next) {
+  if (!req.session.tokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(req.session.tokens);
+  next();
+}
+
 //home route
 app.get('/',(req,res)=>{
   res.send("msg: at home");
 })
+
+// test route
+app.get('/test', (req, res) => {
+  console.log('alive!!')
+  res.send({
+    status:200,
+    msg : "we are up!!"
+  })
+});
 
 // Step 1: Start Google OAuth
 app.get('/auth/google', (req, res) => {
@@ -46,14 +67,6 @@ app.get('/auth/google', (req, res) => {
   res.redirect(authUrl);
 });
 
-app.get('/test', (req, res) => {
-  console.log('alive!!')
-  res.send({
-    status:200,
-    msg : "we are up!!"
-  })
-});
-
 // Step 2: Handle OAuth callback
 app.get('/auth/google/callback', async (req, res) => {
   const code = req.query.code;
@@ -62,6 +75,7 @@ app.get('/auth/google/callback', async (req, res) => {
     oAuth2Client.setCredentials(tokens);
 
     // In production, save tokens to a DB
+    req.session.tokens = tokens;
     global.oauthTokens = tokens;
 
     res.send('Authentication successful! Now go to /heart-rate to fetch data.');
@@ -72,7 +86,7 @@ app.get('/auth/google/callback', async (req, res) => {
 });
 
 // Step 3: Fetch heart rate data
-app.get('/heart-rate', async (req, res) => {
+app.get('/heart-rate', authCheck, async (req, res) => {
   if (!global.oauthTokens) {
     return res.status(401).send('User not authenticated');
   }
@@ -104,7 +118,7 @@ app.get('/heart-rate', async (req, res) => {
 });
 
 // Step 4: Fetch Sleep Duration data
-app.get('/sleep', async (req, res) => {
+app.get('/sleep', authCheck, async (req, res) => {
   if (!global.oauthTokens) return res.status(401).send('User not authenticated');
   oAuth2Client.setCredentials(global.oauthTokens);
 
@@ -129,7 +143,7 @@ app.get('/sleep', async (req, res) => {
 });
 
 // Step 5: Fetch Step Count Data
-app.get('/steps', async (req, res) => {
+app.get('/steps', authCheck, async (req, res) => {
   if (!global.oauthTokens) return res.status(401).send('User not authenticated');
   oAuth2Client.setCredentials(global.oauthTokens);
 
@@ -156,7 +170,7 @@ app.get('/steps', async (req, res) => {
 });
 
 // Step 6: Fetch Physical Activity Data
-app.get('/activity', async (req, res) => {
+app.get('/activity', authCheck, async (req, res) => {
   if (!global.oauthTokens) return res.status(401).send('User not authenticated');
   oAuth2Client.setCredentials(global.oauthTokens);
 
@@ -183,7 +197,7 @@ app.get('/activity', async (req, res) => {
 });
 
 // Step 7: Fetch Breathing Rate/ Oxygen Saturation Data
-app.get('/oxygen-saturation', async (req, res) => {
+app.get('/oxygen-saturation', authCheck, async (req, res) => {
   if (!global.oauthTokens) return res.status(401).send('User not authenticated');
   oAuth2Client.setCredentials(global.oauthTokens);
 
@@ -210,7 +224,7 @@ app.get('/oxygen-saturation', async (req, res) => {
 });
 
 // Step 8: Fetch Body Temperature Data
-app.get('/body-temperature', async (req, res) => {
+app.get('/body-temperature', authCheck, async (req, res) => {
   if (!global.oauthTokens) return res.status(401).send('User not authenticated');
   oAuth2Client.setCredentials(global.oauthTokens);
 
