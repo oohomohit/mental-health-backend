@@ -43,6 +43,134 @@ function authCheck(req, res, next) {
   next();
 }
 
+// Fetch heart rate data
+async function getHeartRateData() {
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    // Calculate average heart rate
+    const heartRateValues = response.data.point.map(point => point.value[0].fpVal);
+    const averageHeartRate = heartRateValues.reduce((a, b) => a + b, 0) / heartRateValues.length;
+    return { average: averageHeartRate };
+  } catch (error) {
+    console.error('Error fetching heart rate data:', error);
+    throw new Error('Failed to fetch heart rate data');
+  }
+}
+
+// Fetch sleep data
+async function getSleepData() {
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+
+  try {
+    const response = await fitness.users.dataset.aggregate({
+      userId: 'me',
+      requestBody: {
+        aggregateBy: [{
+          dataSourceId: 'derived:com.google.sleep.segment:com.google.android.gms:merge_sleep_segments',
+        }],
+        bucketByTime: { durationMillis: 86400000 },  // 1 day
+        startTimeMillis: dayjs().subtract(1, 'day').valueOf(),
+        endTimeMillis: dayjs().valueOf(),
+      },
+    });
+
+    const sleepDuration = response.data.bucket[0].dataset[0].point[0].value[0].intVal;
+    return { duration: `${sleepDuration / 60} minutes` };
+  } catch (error) {
+    console.error('Error fetching sleep data:', error);
+    throw new Error('Failed to fetch sleep data');
+  }
+}
+
+// Fetch steps data
+async function getStepsData() {
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_count_delta';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    const totalSteps = response.data.point.reduce((sum, point) => sum + point.value[0].intVal, 0);
+    return { totalSteps };
+  } catch (error) {
+    console.error('Error fetching steps data:', error);
+    throw new Error('Failed to fetch steps data');
+  }
+}
+
+// Fetch oxygen saturation data
+async function getOxygenSaturationData() {
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.oxygen_saturation.bpm:com.google.android.gms:merge_oxygen_saturation_bpm';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    const oxygenValues = response.data.point.map(point => point.value[0].fpVal);
+    const averageOxygen = oxygenValues.reduce((a, b) => a + b, 0) / oxygenValues.length;
+    return { average: averageOxygen };
+  } catch (error) {
+    console.error('Error fetching oxygen saturation data:', error);
+    throw new Error('Failed to fetch oxygen saturation data');
+  }
+}
+
+// Fetch temperature data (using another relevant source)
+async function getTemperatureData() {
+  const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
+
+  const dataset = `${startTime}-${endTime}`;
+  const dataSourceId = 'derived:com.google.body.temperature.bpm:com.google.android.gms:merge_body_temperature';
+
+  try {
+    const response = await fitness.users.dataSources.datasets.get({
+      userId: 'me',
+      dataSourceId,
+      datasetId: dataset,
+    });
+
+    const temperature = response.data.point[0].value[0].fpVal;
+    return { value: temperature };
+  } catch (error) {
+    console.error('Error fetching temperature data:', error);
+    throw new Error('Failed to fetch temperature data');
+  }
+}
+
 //home route
 app.get('/', (req, res) => {
   res.send(`
@@ -85,16 +213,45 @@ app.get('/auth/google/callback', async (req, res) => {
     global.oauthTokens = tokens;
 
     res.send(`
-      <h2>✅ Authentication successful!</h2>
-      <p>Click any endpoint below to test:</p>
-      <ul>
-        <li><a href="/heart-rate" target="_blank">💓 Heart Rate</a></li>
-        <li><a href="/sleep" target="_blank">🛌 Sleep Duration</a></li>
-        <li><a href="/steps" target="_blank">👣 Steps Count</a></li>
-        <li><a href="/oxygen-saturation" target="_blank">🫁 Oxygen Saturation</a></li>
-        <li><a href="/activity" target="_blank">🏃 Physical Activity</a></li>
-        <li><a href="/body-temperature" target="_blank">🌡️ Temperature</a></li>
-      </ul>
+      <html>
+        <head>
+          <title>Health Monitor - Authenticated</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 30px;
+              background: #e9f7ef;
+              color: #2c3e50;
+            }
+            h1 {
+              color: #27ae60;
+            }
+            ul {
+              list-style: none;
+              padding-left: 0;
+            }
+            li {
+              margin-bottom: 10px;
+            }
+            a {
+              text-decoration: none;
+              color: #2980b9;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>✅ Authentication Successful!</h1>
+          <p>You can now access your health data using the following endpoints:</p>
+          <ul>
+            <li><a href="/dashboard">/dashboard</a> – Full health summary</li>
+            <li><a href="/heart-rate">/heart-rate</a> – Average heart rate</li>
+            <li><a href="/steps">/steps</a> – Total steps</li>
+            <li><a href="/sleep">/sleep</a> – Sleep duration</li>
+            <li><a href="/oxygen">/oxygen</a> – Oxygen saturation</li>
+            <li><a href="/temperature">/temperature</a> – Body temperature</li>
+          </ul>
+        </body>
+      </html>
     `);
   } catch (err) {
     console.error('Error getting tokens:', err);
@@ -266,6 +423,51 @@ app.get('/body-temperature', authCheck, async (req, res) => {
     res.status(500).send('Failed to fetch body temperature');
   }
 });
+
+// Dashboard
+app.get('/dashboard', authCheck, async (req, res) => {
+  try {
+    const heartRateData = await getHeartRateData();
+    const sleepData = await getSleepData();
+    const stepsData = await getStepsData();
+    const oxygenData = await getOxygenSaturationData();
+    const temperatureData = await getTemperatureData();
+
+    const dashboardData = {
+      heartRateAvg: heartRateData.average,
+      totalSteps: stepsData.totalSteps,
+      sleepDuration: sleepData.duration,
+      oxygenAvg: oxygenData.average,
+      temperature: temperatureData.value,
+    };
+
+    const html = `
+      <h1>📊 Health Dashboard</h1>
+      <ul>
+        <li><strong>Average Heart Rate:</strong> ${dashboardData.heartRateAvg} bpm</li>
+        <li><strong>Total Steps (24h):</strong> ${dashboardData.totalSteps}</li>
+        <li><strong>Sleep Duration:</strong> ${dashboardData.sleepDuration} hours</li>
+        <li><strong>Oxygen Saturation Avg:</strong> ${dashboardData.oxygenAvg} %</li>
+        <li><strong>Temperature:</strong> ${dashboardData.temperature} °C</li>
+      </ul>
+
+      <h3>🔍 Raw Data Endpoints</h3>
+      <ul>
+        <li><a href="/heart-rate">Heart Rate JSON</a></li>
+        <li><a href="/sleep">Sleep JSON</a></li>
+        <li><a href="/steps">Steps JSON</a></li>
+        <li><a href="/oxygen">Oxygen Saturation JSON</a></li>
+        <li><a href="/temperature">Temperature JSON</a></li>
+      </ul>
+    `;
+
+    res.send(html);
+  } catch (error) {
+    console.error('Failed to fetch dashboard data:', error);
+    res.status(500).send('Failed to fetch dashboard data');
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`✅ Server running at http://localhost:${port}`);
