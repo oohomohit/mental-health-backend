@@ -44,9 +44,15 @@ function authCheck(req, res, next) {
 }
 
 //home route
-app.get('/',(req,res)=>{
-  res.send("msg: at home");
-})
+app.get('/', (req, res) => {
+  res.send(`
+    <h2>👋 Welcome to the Mental Health Monitor</h2>
+    <p>To get started, please authenticate with your Google account:</p>
+    <a href="/auth/google" style="padding: 10px 20px; background-color: #4285F4; color: white; text-decoration: none; border-radius: 5px;">
+      🔐 Sign in with Google
+    </a>
+  `);
+});
 
 // test route
 app.get('/test', (req, res) => {
