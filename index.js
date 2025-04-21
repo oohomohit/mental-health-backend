@@ -248,8 +248,8 @@ app.get('/auth/google/callback', async (req, res) => {
             <li><a href="/steps">/steps</a> – Total steps</li>
             <li><a href="/activity">/activity</a> – Avg physical activity</li>
             <li><a href="/sleep">/sleep</a> – Sleep duration</li>
-            <li><a href="/oxygen-saturation">/oxygen</a> – Oxygen saturation</li>
-            <li><a href="/body-temperature">/temperature</a> – Body temperature</li>
+            <li><a href="/oxygen-saturation">/oxygen-saturation</a> – Oxygen saturation</li>
+            <li><a href="/body-temperature">/body-temperature</a> – Body temperature</li>
           </ul>
         </body>
       </html>
