@@ -4,7 +4,6 @@ const dashboardSchema = new mongoose.Schema({
   heartRateAvg: Number,
   totalSteps: Number,
   sleepDuration: Number,
-  activity: Number,
   oxygenAvg: Number,
   temperature: Number,
 }, {

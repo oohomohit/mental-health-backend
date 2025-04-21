@@ -24,22 +24,12 @@ app.use(session({
 
 
 //connection to mongodb
-mongoose.connect('process.env.MONGODB_URI', {
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
 .then(() => console.log('Connected to MongoDB Atlas'))
 .catch((err) => console.error('MongoDB Atlas connection error:', err));
-
-
-//mongoos schema
-const dashboardData = {
-  heartRateAvg: heartRateData.average,
-  totalSteps: stepsData.totalSteps,
-  sleepDuration: sleepData.duration,
-  oxygenAvg: oxygenData.average,
-  temperature: temperatureData.value,
-};
 
 // Google OAuth2 client setup
 const oAuth2Client = new google.auth.OAuth2(
