@@ -83,24 +83,32 @@ async function getHeartRateData() {
 // Fetch sleep data
 async function getSleepData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').toISOString();
+  const endTime = now.toISOString();
 
   try {
-    const response = await fitness.users.dataset.aggregate({
+    const response = await fitness.users.sessions.list({
       userId: 'me',
-      requestBody: {
-        aggregateBy: [{
-          dataSourceId: 'derived:com.google.sleep.segment:com.google.android.gms:merge_sleep_segments',
-        }],
-        bucketByTime: { durationMillis: 86400000 },  // 1 day
-        startTimeMillis: dayjs().subtract(1, 'day').valueOf(),
-        endTimeMillis: dayjs().valueOf(),
-      },
+      startTime,
+      endTime,
     });
 
-    const sleepDuration = response.data.bucket[0].dataset[0].point[0].value[0].intVal;
-    return { duration: `${sleepDuration / 60} minutes` };
+    const sessions = response.data.session || [];
+
+    const sleepSessions = sessions.filter(s => s.activityType === 72); // 72 = sleep
+
+    let totalSleepMillis = 0;
+    for (const session of sleepSessions) {
+      const start = parseInt(session.startTimeMillis);
+      const end = parseInt(session.endTimeMillis);
+      totalSleepMillis += (end - start);
+    }
+
+    const sleepHours = (totalSleepMillis / (1000 * 60 * 60)).toFixed(2); // to hours
+    return { duration: parseFloat(sleepHours) };
   } catch (error) {
-    console.error('Error fetching sleep data:', error);
+    console.error('Error fetching sleep data:', error.response?.data || error);
     throw new Error('Failed to fetch sleep data');
   }
 }
