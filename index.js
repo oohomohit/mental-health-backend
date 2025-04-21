@@ -57,8 +57,8 @@ function authCheck(req, res, next) {
 async function getHeartRateData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
-  const endTime = now.valueOf() * 1_000_000;
+  const startTime = now.subtract(1, 'day').unix() * 1_000_000_000;
+  const endTime = now.unix() * 1_000_000_000;
 
   const dataset = `${startTime}-${endTime}`;
   const dataSourceId = 'derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm';
@@ -70,8 +70,12 @@ async function getHeartRateData() {
       datasetId: dataset,
     });
 
-    // Calculate average heart rate
-    const heartRateValues = response.data.point.map(point => point.value[0].fpVal);
+    const points = response.data.point;
+    if (!points || points.length === 0) {
+      throw new Error('No heart rate data found');
+    }
+
+    const heartRateValues = points.map(point => point.value[0].fpVal);
     const averageHeartRate = heartRateValues.reduce((a, b) => a + b, 0) / heartRateValues.length;
     return { average: averageHeartRate };
   } catch (error) {
@@ -84,18 +88,17 @@ async function getHeartRateData() {
 async function getSleepData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').toISOString();
-  const endTime = now.toISOString();
+  const startTime = now.subtract(1, 'day').valueOf();
+  const endTime = now.valueOf();
 
   try {
     const response = await fitness.users.sessions.list({
       userId: 'me',
-      startTime,
-      endTime,
+      startTime: startTime.toString(),
+      endTime: endTime.toString(),
     });
 
     const sessions = response.data.session || [];
-
     const sleepSessions = sessions.filter(s => s.activityType === 72); // 72 = sleep
 
     let totalSleepMillis = 0;
@@ -117,8 +120,8 @@ async function getSleepData() {
 async function getStepsData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
-  const endTime = now.valueOf() * 1_000_000;
+  const startTime = now.subtract(1, 'day').valueOf();
+  const endTime = now.valueOf();
 
   const dataset = `${startTime}-${endTime}`;
   const dataSourceId = 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_count_delta';
@@ -133,7 +136,7 @@ async function getStepsData() {
     const totalSteps = response.data.point.reduce((sum, point) => sum + point.value[0].intVal, 0);
     return { totalSteps };
   } catch (error) {
-    console.error('Error fetching steps data:', error);
+    console.error('Error fetching steps data:', error.response?.data || error);
     throw new Error('Failed to fetch steps data');
   }
 }
