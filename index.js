@@ -4,11 +4,12 @@ const { google } = require('googleapis');
 const dotenv = require('dotenv');
 const dayjs = require('dayjs');
 const session = require('express-session');
+const mongoose = require('mongoose');
+const Dashboard = require('./models/dashboard.model');
 
 dotenv.config();
 const app = express();
 const port = 3000;
-
 
 app.use(cors({
   origin: '*'  // Replace with the frontend URL
@@ -20,6 +21,25 @@ app.use(session({
   resave: false,
   saveUninitialized: true,
 }));
+
+
+//connection to mongodb
+mongoose.connect('process.env.MONGODB_URI', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => console.log('Connected to MongoDB Atlas'))
+.catch((err) => console.error('MongoDB Atlas connection error:', err));
+
+
+//mongoos schema
+const dashboardData = {
+  heartRateAvg: heartRateData.average,
+  totalSteps: stepsData.totalSteps,
+  sleepDuration: sleepData.duration,
+  oxygenAvg: oxygenData.average,
+  temperature: temperatureData.value,
+};
 
 // Google OAuth2 client setup
 const oAuth2Client = new google.auth.OAuth2(
@@ -461,7 +481,10 @@ app.get('/dashboard', authCheck, async (req, res) => {
         <li><a href="/temperature">Temperature JSON</a></li>
       </ul>
     `;
-
+    
+    const newEntry = new Dashboard(dashboardData);
+    await newEntry.save();
+    
     res.send(html);
   } catch (error) {
     console.error('[💥 DASHBOARD ERROR]:', error.message);
