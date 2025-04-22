@@ -90,30 +90,40 @@ async function getHeartRateData() {
 async function getSleepData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').toISOString();
-  const endTime = now.toISOString();
+  const startTimeMillis = now.subtract(1, 'day').valueOf();
+  const endTimeMillis = now.valueOf();
 
   try {
     const response = await fitness.users.sessions.list({
       userId: 'me',
-      startTime,
-      endTime,
+      startTime: new Date(startTimeMillis).toISOString(),
+      endTime: new Date(endTimeMillis).toISOString(),
     });
 
     const sessions = response.data.session || [];
-    console.log("Sleep sessions response:", sessions); // 👈 log this
+    const sleepSessions = sessions.filter(session => session.activityType === 72);
 
-    const sleepSessions = sessions.filter(s => s.activityType === 72);
+    const parsedSessions = sleepSessions.map(session => {
+      const start = dayjs(Number(session.startTimeMillis));
+      const end = dayjs(Number(session.endTimeMillis));
+      return {
+        start: start.format('YYYY-MM-DD HH:mm:ss'),
+        end: end.format('YYYY-MM-DD HH:mm:ss'),
+        durationMinutes: end.diff(start, 'minute'),
+      };
+    });
 
-    let totalSleepMillis = 0;
-    for (const session of sleepSessions) {
-      const start = parseInt(session.startTimeMillis);
-      const end = parseInt(session.endTimeMillis);
-      totalSleepMillis += (end - start);
-    }
+    const totalSleepMinutes = parsedSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const hours = Math.floor(totalSleepMinutes / 60);
+    const minutes = totalSleepMinutes % 60;
 
-    const sleepHours = (totalSleepMillis / (1000 * 60 * 60)).toFixed(2);
-    return { duration: parseFloat(sleepHours) };
+    return {
+      totalSleep: {
+        hours,
+        minutes
+      },
+      sessions: parsedSessions
+    };
   } catch (error) {
     console.error('Error fetching sleep data:', error.response?.data || error);
     throw new Error('Failed to fetch sleep data');
@@ -346,18 +356,40 @@ app.get('/sleep', authCheck, async (req, res) => {
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
-  const endTime = now.valueOf() * 1_000_000;
+  const startTimeMillis = now.subtract(1, 'day').valueOf();
+  const endTimeMillis = now.valueOf();
 
   try {
     const response = await fitness.users.sessions.list({
       userId: 'me',
-      startTime: new Date(startTime / 1_000_000).toISOString(),
-      endTime: new Date(endTime / 1_000_000).toISOString(),
+      startTime: new Date(startTimeMillis).toISOString(),
+      endTime: new Date(endTimeMillis).toISOString(),
     });
 
-    const sleepSessions = response.data.session?.filter(s => s.activityType === 72); // 72 is sleep
-    res.json(sleepSessions || []);
+    const sessions = response.data.session || [];
+    const sleepSessions = sessions.filter(session => session.activityType === 72);
+
+    const parsedSessions = sleepSessions.map(session => {
+      const start = dayjs(Number(session.startTimeMillis));
+      const end = dayjs(Number(session.endTimeMillis));
+      return {
+        start: start.format('YYYY-MM-DD HH:mm:ss'),
+        end: end.format('YYYY-MM-DD HH:mm:ss'),
+        durationMinutes: end.diff(start, 'minute'),
+      };
+    });
+
+    const totalSleepMinutes = parsedSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const hours = Math.floor(totalSleepMinutes / 60);
+    const minutes = totalSleepMinutes % 60;
+
+    res.json({
+      totalSleep: {
+        hours,
+        minutes
+      },
+      sessions: parsedSessions,
+    });
   } catch (error) {
     console.error('Failed to fetch sleep:', error);
     res.status(500).send('Failed to fetch sleep data');
@@ -491,11 +523,13 @@ app.get('/dashboard', authCheck, async (req, res) => {
     const stepsData = await getStepsData().catch(e => { throw new Error("Steps: " + e.message) });
     const oxygenData = await getOxygenSaturationData().catch(e => { throw new Error("Oxygen: " + e.message) });
     const temperatureData = await getTemperatureData().catch(e => { throw new Error("Temperature: " + e.message) });
+    
+    const { hours: sleepHours, minutes: sleepMinutes } = sleepData.totalSleep;
 
     const dashboardData = {
       heartRateAvg: cleanData(heartRateData.average),
       totalSteps: cleanData(stepsData.totalSteps),
-      sleepDuration: cleanData(sleepData.duration),
+      sleepDuration: cleanData(`${sleepData.hours} hr ${sleepData.minutes} min`),
       oxygenAvg: cleanData(oxygenData.average),
       temperature: cleanData(temperatureData.value),
     };
@@ -505,7 +539,7 @@ app.get('/dashboard', authCheck, async (req, res) => {
       <ul>
         <li><strong>Average Heart Rate:</strong> ${dashboardData.heartRateAvg} bpm</li>
         <li><strong>Total Steps (24h):</strong> ${dashboardData.totalSteps}</li>
-        <li><strong>Sleep Duration:</strong> ${dashboardData.sleepDuration} hours</li>
+        <li><strong>Sleep Duration:</strong> ${sleepHours} hr ${sleepMinutes} min</li>
         <li><strong>Oxygen Saturation Avg:</strong> ${dashboardData.oxygenAvg} %</li>
         <li><strong>Temperature:</strong> ${dashboardData.temperature} °C</li>
       </ul>
