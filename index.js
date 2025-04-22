@@ -126,7 +126,7 @@ async function getStepsData() {
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_count_delta';
+  const dataSourceId = 'derived:com.google.step_count.delta:com.google.android.gms:estimated_steps';
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
