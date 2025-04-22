@@ -458,6 +458,11 @@ app.get('/body-temperature', authCheck, async (req, res) => {
 // Dashboard
 app.get('/dashboard', authCheck, async (req, res) => {
   try {
+    
+    const cleanData = (value) => {
+      return isNaN(value) ? null : value;
+    };
+
     const heartRateData = await getHeartRateData().catch(e => { throw new Error("Heart Rate: " + e.message) });
     const sleepData = await getSleepData().catch(e => { throw new Error("Sleep: " + e.message) });
     const stepsData = await getStepsData().catch(e => { throw new Error("Steps: " + e.message) });
@@ -465,11 +470,11 @@ app.get('/dashboard', authCheck, async (req, res) => {
     const temperatureData = await getTemperatureData().catch(e => { throw new Error("Temperature: " + e.message) });
 
     const dashboardData = {
-      heartRateAvg: heartRateData.average,
-      totalSteps: stepsData.totalSteps,
-      sleepDuration: sleepData.duration,
-      oxygenAvg: oxygenData.average,
-      temperature: temperatureData.value,
+      heartRateAvg: cleanData(heartRateData.average),
+      totalSteps: cleanData(stepsData.totalSteps),
+      sleepDuration: cleanData(sleepData.duration),
+      oxygenAvg: cleanData(oxygenData.average),
+      temperature: cleanData(temperatureData.value),
     };
 
     const html = `
