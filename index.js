@@ -88,18 +88,20 @@ async function getHeartRateData() {
 async function getSleepData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf();
-  const endTime = now.valueOf();
+  const startTime = now.subtract(1, 'day').toISOString();
+  const endTime = now.toISOString();
 
   try {
     const response = await fitness.users.sessions.list({
       userId: 'me',
-      startTime: startTime.toString(),
-      endTime: endTime.toString(),
+      startTime,
+      endTime,
     });
 
     const sessions = response.data.session || [];
-    const sleepSessions = sessions.filter(s => s.activityType === 72); // 72 = sleep
+    console.log("Sleep sessions response:", sessions); // 👈 log this
+
+    const sleepSessions = sessions.filter(s => s.activityType === 72);
 
     let totalSleepMillis = 0;
     for (const session of sleepSessions) {
@@ -108,7 +110,7 @@ async function getSleepData() {
       totalSleepMillis += (end - start);
     }
 
-    const sleepHours = (totalSleepMillis / (1000 * 60 * 60)).toFixed(2); // to hours
+    const sleepHours = (totalSleepMillis / (1000 * 60 * 60)).toFixed(2);
     return { duration: parseFloat(sleepHours) };
   } catch (error) {
     console.error('Error fetching sleep data:', error.response?.data || error);
@@ -314,38 +316,29 @@ app.get('/heart-rate', authCheck, async (req, res) => {
 });
 
 // Step 4: Fetch Sleep Duration data
-async function getSleepData() {
+app.get('/sleep', authCheck, async (req, res) => {
+  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  oAuth2Client.setCredentials(global.oauthTokens);
+
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').toISOString();
-  const endTime = now.toISOString();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
 
   try {
     const response = await fitness.users.sessions.list({
       userId: 'me',
-      startTime,
-      endTime,
+      startTime: new Date(startTime / 1_000_000).toISOString(),
+      endTime: new Date(endTime / 1_000_000).toISOString(),
     });
 
-    const sessions = response.data.session || [];
-    console.log("Sleep sessions response:", sessions); // 👈 log this
-
-    const sleepSessions = sessions.filter(s => s.activityType === 72);
-
-    let totalSleepMillis = 0;
-    for (const session of sleepSessions) {
-      const start = parseInt(session.startTimeMillis);
-      const end = parseInt(session.endTimeMillis);
-      totalSleepMillis += (end - start);
-    }
-
-    const sleepHours = (totalSleepMillis / (1000 * 60 * 60)).toFixed(2);
-    return { duration: parseFloat(sleepHours) };
+    const sleepSessions = response.data.session?.filter(s => s.activityType === 72); // 72 is sleep
+    res.json(sleepSessions || []);
   } catch (error) {
-    console.error('Error fetching sleep data:', error.response?.data || error);
-    throw new Error('Failed to fetch sleep data');
+    console.error('Failed to fetch sleep:', error);
+    res.status(500).send('Failed to fetch sleep data');
   }
-}
+});
 
 // Step 5: Fetch Step Count Data
 app.get('/steps', authCheck, async (req, res) => {
