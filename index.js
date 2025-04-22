@@ -122,8 +122,8 @@ async function getSleepData() {
 async function getStepsData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf();
-  const endTime = now.valueOf();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
   const dataSourceId = 'derived:com.google.step_count.delta:com.google.android.gms:merge_step_count_delta';
@@ -135,7 +135,11 @@ async function getStepsData() {
       datasetId: dataset,
     });
 
-    const totalSteps = response.data.point.reduce((sum, point) => sum + point.value[0].intVal, 0);
+    const totalSteps = (response.data.point || []).reduce((sum, point) => {
+      const stepVal = point.value?.[0]?.intVal || 0;
+      return sum + stepVal;
+    }, 0);
+
     return { totalSteps };
   } catch (error) {
     console.error('Error fetching steps data:', error.response?.data || error);
@@ -412,7 +416,7 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'derived:com.google.oxygen_saturation:com.google.android.gms:merge_oxygen_saturation';
+  const dataSourceId = 'derived:com.google.oxygen.saturation.bpm:com.google.android.gms:merge_oxygen_saturation';
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
