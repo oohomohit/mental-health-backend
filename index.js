@@ -492,8 +492,8 @@ app.get('/dashboard', authCheck, async (req, res) => {
         <li><a href="/heart-rate">Heart Rate JSON</a></li>
         <li><a href="/sleep">Sleep JSON</a></li>
         <li><a href="/steps">Steps JSON</a></li>
-        <li><a href="/oxygen">Oxygen Saturation JSON</a></li>
-        <li><a href="/temperature">Temperature JSON</a></li>
+        <li><a href="/oxygen-saturation">Oxygen Saturation JSON</a></li>
+        <li><a href="/body-temperature">Temperature JSON</a></li>
       </ul>
     `;
     
