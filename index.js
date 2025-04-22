@@ -428,7 +428,7 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const startTime = now.subtract(7, 'day').valueOf() * 1_000_000;
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
