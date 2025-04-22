@@ -381,17 +381,17 @@ app.get('/steps', authCheck, async (req, res) => {
 });
 
 // Step 6: Fetch Physical Activity Data
-app.get('/oxygen-saturation', authCheck, async (req, res) => {
+app.get('/activity', authCheck, async (req, res) => {
   if (!global.oauthTokens) return res.status(401).send('User not authenticated');
   oAuth2Client.setCredentials(global.oauthTokens);
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;  // Last 24 hours
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'derived:com.google.oxygen_saturation';  // Correct data source ID
+  const dataSourceId = 'derived:com.google.activity.segment:com.google.android.gms:merge_activity_segments';
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
@@ -400,24 +400,10 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
       datasetId: dataset,
     });
 
-    // Check if there is data available
-    if (response.data.point && response.data.point.length > 0) {
-      // Format the data if necessary
-      const oxygenSaturationData = response.data.point.map(point => {
-        return {
-          timestamp: point.startTimeNanos,
-          oxygenSaturation: point.value[0]?.floatVal || null, // Blood oxygen saturation
-        };
-      });
-
-      // Return the oxygen saturation data
-      res.json(oxygenSaturationData);
-    } else {
-      res.status(404).send('No oxygen saturation data available for the selected time period');
-    }
+    res.json(response.data);
   } catch (error) {
-    console.error('Failed to fetch oxygen saturation:', error.response?.data || error.message);
-    res.status(500).send('Failed to fetch oxygen saturation');
+    console.error('Failed to fetch activity:', error);
+    res.status(500).send('Failed to fetch activity data');
   }
 });
 
@@ -432,7 +418,7 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'derived:com.google.oxygen.saturation.bpm:com.google.android.gms:merge_oxygen_saturation';
+  const dataSourceId = 'derived:com.google.oxygen_saturation.bpm:com.google.android.gms:merge_oxygen_saturation';
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
@@ -441,10 +427,29 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
       datasetId: dataset,
     });
 
-    res.json(response.data);
+    const points = response.data.point || [];
+
+    const oxygenData = points
+      .map(point => {
+        const value = point.value?.[0]?.fpVal;
+        if (value >= 0 && value <= 100) {
+          return {
+            timestamp: new Date(Number(point.startTimeNanos) / 1_000_000).toISOString(),
+            oxygenSaturation: value,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    if (oxygenData.length === 0) {
+      return res.status(404).json({ message: 'No oxygen saturation data available in the 0–100% range' });
+    }
+
+    res.json({ oxygenSaturationData: oxygenData });
   } catch (error) {
-    console.error('Failed to fetch oxygen saturation:', error);
-    res.status(500).send('Failed to fetch oxygen saturation');
+    console.error('Error fetching oxygen saturation data:', error.response?.data || error.message);
+    res.status(500).send('Failed to fetch oxygen saturation data');
   }
 });
 
