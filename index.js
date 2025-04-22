@@ -409,16 +409,15 @@ app.get('/activity', authCheck, async (req, res) => {
 
 // Step 7: Fetch Breathing Rate/ Oxygen Saturation Data
 app.get('/oxygen-saturation', authCheck, async (req, res) => {
-  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
-  oAuth2Client.setCredentials(global.oauthTokens);
-
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
-  const now = dayjs();
-  const startTime = now.subtract(7, 'day').valueOf() * 1_000_000;
-  const endTime = now.valueOf() * 1_000_000;
 
+  const dayjs = require('dayjs');
+  const now = dayjs();
+  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const endTime = now.valueOf() * 1_000_000;
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'raw:com.google.oxygen_saturation:com.google.android.apps.fitness';
+
+  const dataSourceId = 'derived:com.google.oxygen_saturation:com.google.android.gms:merged';
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
@@ -429,27 +428,15 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
 
     const points = response.data.point || [];
 
-    const oxygenData = points
-      .map(point => {
-        const value = point.value?.[0]?.fpVal;
-        if (value >= 0 && value <= 100) {
-          return {
-            timestamp: new Date(Number(point.startTimeNanos) / 1_000_000).toISOString(),
-            oxygenSaturation: value,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
+    const data = points.map(point => ({
+      timestamp: point.startTimeNanos,
+      oxygenSaturation: point.value?.[0]?.fpVal ?? null
+    })).filter(p => p.oxygenSaturation !== null);
 
-    if (oxygenData.length === 0) {
-      return res.status(404).json({ message: 'No oxygen saturation data available in the 0–100% range' });
-    }
-
-    res.json({ oxygenSaturationData: oxygenData });
+    res.json(data);
   } catch (error) {
-    console.error('Error fetching oxygen saturation data:', error.response?.data || error.message);
-    res.status(500).send('Failed to fetch oxygen saturation data');
+    console.error('Failed to fetch oxygen saturation:', error);
+    res.status(500).send('Oxygen Saturation: Failed to fetch data');
   }
 });
 
