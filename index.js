@@ -157,7 +157,7 @@ async function getOxygenSaturationData() {
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'derived:com.google.oxygen_saturation.bpm:com.google.android.gms:merge_oxygen_saturation_bpm';
+  const dataSourceId = 'derived:com.google.oxygen_saturation:com.google.android.gms:merged';
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
@@ -166,9 +166,20 @@ async function getOxygenSaturationData() {
       datasetId: dataset,
     });
 
-    const oxygenValues = response.data.point.map(point => point.value[0].fpVal);
-    const averageOxygen = oxygenValues.reduce((a, b) => a + b, 0) / oxygenValues.length;
-    return { average: averageOxygen };
+    const points = response.data.point || [];
+
+    const parsed = points.map(point => ({
+      timestamp: dayjs(Number(point.startTimeNanos) / 1e6).format('YYYY-MM-DD HH:mm:ss'),
+      oxygenSaturation: point.value?.[0]?.fpVal ?? null
+    })).filter(p => p.oxygenSaturation !== null);
+
+    const values = parsed.map(p => p.oxygenSaturation);
+    const average = values.reduce((sum, val) => sum + val, 0) / values.length;
+
+    return {
+      average,
+      values: parsed
+    };
   } catch (error) {
     console.error('Error fetching oxygen saturation data:', error);
     throw new Error('Failed to fetch oxygen saturation data');
