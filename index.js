@@ -519,8 +519,11 @@ app.get('/dashboard', authCheck, async (req, res) => {
   try {
     
     const cleanData = (value) => {
-      return isNaN(value) ? null : value;
-    };
+      if (value === undefined || value === null) return null;
+      if (typeof value === 'number') return isNaN(value) ? null : value;
+      if (typeof value === 'string') return value.trim() === '' ? null : value;
+      return value;
+    };    
 
     const heartRateData = await getHeartRateData().catch(e => { throw new Error("Heart Rate: " + e.message) });
     const sleepData = await getSleepData().catch(e => { throw new Error("Sleep: " + e.message) });

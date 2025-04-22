@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const dashboardSchema = new mongoose.Schema({
   heartRateAvg: { type: Number, required: true },
   totalSteps: { type: Number, required: true },
-  sleepDuration: { type: Number, required: true },
+  sleepDuration: { type: String, required: false },
   oxygenAvg: { type: Number, required: false, default: null },
   temperature: { type: Number, required: false, default: null },
 }, {
