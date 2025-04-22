@@ -101,7 +101,14 @@ async function getSleepData() {
     });
 
     const sessions = response.data.session || [];
-    const sleepSessions = sessions.filter(session => session.activityType === 72);
+
+    const sleepSessions = sessions
+      .filter(session =>
+        session.activityType === 72 &&
+        session.startTimeMillis &&
+        session.endTimeMillis &&
+        Number(session.endTimeMillis) > Number(session.startTimeMillis)
+      );
 
     const parsedSessions = sleepSessions.map(session => {
       const start = dayjs(Number(session.startTimeMillis));
@@ -118,11 +125,8 @@ async function getSleepData() {
     const minutes = totalSleepMinutes % 60;
 
     return {
-      totalSleep: {
-        hours,
-        minutes
-      },
-      sessions: parsedSessions
+      totalSleep: { hours, minutes },
+      sessions: parsedSessions,
     };
   } catch (error) {
     console.error('Error fetching sleep data:', error.response?.data || error);
@@ -529,7 +533,7 @@ app.get('/dashboard', authCheck, async (req, res) => {
     const dashboardData = {
       heartRateAvg: cleanData(heartRateData.average),
       totalSteps: cleanData(stepsData.totalSteps),
-      sleepDuration: cleanData(`${sleepData.hours} hr ${sleepData.minutes} min`),
+      sleepDuration: cleanData(`${sleepHours} hr ${sleepMinutes} min`),
       oxygenAvg: cleanData(oxygenData.average),
       temperature: cleanData(temperatureData.value),
     };
