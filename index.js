@@ -391,7 +391,7 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
-  const dataSourceId = 'com.google.oxygen_saturation';  // Correct data source ID
+  const dataSourceId = 'derived:com.google.oxygen_saturation';  // Correct data source ID
 
   try {
     const response = await fitness.users.dataSources.datasets.get({
