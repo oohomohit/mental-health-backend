@@ -363,41 +363,57 @@ app.get('/sleep', authCheck, async (req, res) => {
   const now = dayjs();
   const startTimeMillis = now.subtract(1, 'day').valueOf();
   const endTimeMillis = now.valueOf();
+  const dataset = `${startTimeMillis * 1_000_000}-${endTimeMillis * 1_000_000}`;
+
+  const dataSourceId = 'derived:com.google.sleep.segment:com.google.android.gms:merged';
+
+  const sleepStageMap = {
+    1: 'Awake',
+    2: 'Sleep',
+    3: 'Out of Bed',
+    4: 'Light Sleep',
+    5: 'Deep Sleep',
+    6: 'REM Sleep'
+  };
 
   try {
-    const response = await fitness.users.sessions.list({
+    const response = await fitness.users.dataSources.datasets.get({
       userId: 'me',
-      startTime: new Date(startTimeMillis).toISOString(),
-      endTime: new Date(endTimeMillis).toISOString(),
+      dataSourceId,
+      datasetId: dataset,
     });
 
-    const sessions = response.data.session || [];
-    const sleepSessions = sessions.filter(session => session.activityType === 72);
+    const points = response.data.point || [];
 
-    const parsedSessions = sleepSessions.map(session => {
-      const start = dayjs(Number(session.startTimeMillis));
-      const end = dayjs(Number(session.endTimeMillis));
+    const stages = points.map(point => {
+      const start = dayjs(Number(point.startTimeNanos) / 1e6);
+      const end = dayjs(Number(point.endTimeNanos) / 1e6);
+      const duration = end.diff(start, 'minute');
+      const stage = point.value[0].intVal;
+
       return {
         start: start.format('YYYY-MM-DD HH:mm:ss'),
         end: end.format('YYYY-MM-DD HH:mm:ss'),
-        durationMinutes: end.diff(start, 'minute'),
+        durationMinutes: duration,
+        stageCode: stage,
+        stage: sleepStageMap[stage] || 'Unknown'
       };
     });
 
-    const totalSleepMinutes = parsedSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const totalSleepMinutes = stages
+      .filter(s => [2, 4, 5, 6].includes(s.stageCode)) // only actual sleep stages
+      .reduce((sum, s) => sum + s.durationMinutes, 0);
+
     const hours = Math.floor(totalSleepMinutes / 60);
     const minutes = totalSleepMinutes % 60;
 
     res.json({
-      totalSleep: {
-        hours,
-        minutes
-      },
-      sessions: parsedSessions,
+      totalSleep: { hours, minutes },
+      stages
     });
   } catch (error) {
-    console.error('Failed to fetch sleep:', error);
-    res.status(500).send('Failed to fetch sleep data');
+    console.error('Failed to fetch detailed sleep data:', error.response?.data || error);
+    res.status(500).send('Failed to fetch sleep segment data');
   }
 });
 
