@@ -385,11 +385,20 @@ app.get('/sleep', authCheck, async (req, res) => {
 
     const points = response.data.point || [];
 
+    if (points.length === 0) {
+      console.warn('No sleep segment data found for the past day.');
+      return res.json({
+        totalSleep: { hours: 0, minutes: 0 },
+        stages: [],
+        message: 'No sleep data available for the past 24 hours.'
+      });
+    }
+
     const stages = points.map(point => {
       const start = dayjs(Number(point.startTimeNanos) / 1e6);
       const end = dayjs(Number(point.endTimeNanos) / 1e6);
       const duration = end.diff(start, 'minute');
-      const stage = point.value[0].intVal;
+      const stage = point.value?.[0]?.intVal ?? 0;
 
       return {
         start: start.format('YYYY-MM-DD HH:mm:ss'),
@@ -401,7 +410,7 @@ app.get('/sleep', authCheck, async (req, res) => {
     });
 
     const totalSleepMinutes = stages
-      .filter(s => [2, 4, 5, 6].includes(s.stageCode)) // only actual sleep stages
+      .filter(s => [2, 4, 5, 6].includes(s.stageCode)) // sleep stages only
       .reduce((sum, s) => sum + s.durationMinutes, 0);
 
     const hours = Math.floor(totalSleepMinutes / 60);
