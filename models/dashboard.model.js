@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const dashboardSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
   heartRateAvg: { type: Number, required: true },
   totalSteps: { type: Number, required: true },
   sleepDuration: { type: String, required: false },

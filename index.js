@@ -20,6 +20,11 @@ app.use(session({
   secret: 'mental-health-secret',
   resave: false,
   saveUninitialized: true,
+  cookie: {
+    maxAge: 7 * 24 * 60 * 60 * 1000,  // 1 week
+    secure: false,
+  },
+  rolling: true,  // Session expiration is refreshed with each request
 }));
 
 
@@ -294,8 +299,12 @@ app.get('/auth/google/callback', async (req, res) => {
     const { tokens } = await oAuth2Client.getToken(code);
     oAuth2Client.setCredentials(tokens);
 
+    const { data: profile } = await oauth2.userinfo.get();
+    const userEmail = profile.email;
+    
     // In production, save tokens to a DB
     req.session.tokens = tokens;
+    req.session.email = userEmail;
     global.oauthTokens = tokens;
 
     res.send(`
@@ -588,6 +597,13 @@ app.get('/body-temperature', authCheck, async (req, res) => {
 // Dashboard
 app.get('/dashboard', authCheck, async (req, res) => {
   try {
+     // Get user's email from session
+     const userEmail = req.session.email;
+
+     // Ensure that userEmail is available
+     if (!userEmail) {
+       return res.status(400).send('User email not found');
+     }
     
     const cleanData = (value) => {
       if (value === undefined || value === null) return null;
