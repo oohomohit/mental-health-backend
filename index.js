@@ -324,11 +324,6 @@ app.get('/auth/google/callback', async (req, res) => {
 
 // Step 3: Fetch heart rate data
 app.get('/heart-rate', authCheck, async (req, res) => {
-  if (!global.oauthTokens) {
-    return res.status(401).send('User not authenticated');
-  }
-
-  oAuth2Client.setCredentials(global.oauthTokens);
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
 
@@ -356,21 +351,19 @@ app.get('/heart-rate', authCheck, async (req, res) => {
 
 // Step 4: Fetch Sleep Duration data
 app.get('/sleep', authCheck, async (req, res) => {
-  if (!global.oauthTokens) {
-    return res.status(401).send('User not authenticated');
-  }
-
-  oAuth2Client.setCredentials(global.oauthTokens);
-
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
-
+  const dayjs = require('dayjs');
   const now = dayjs();
-  const startTimeMillis = now.subtract(1, 'day').valueOf();
+
+  // Define start and end time for querying the last 7 days (adjustable)
+  const startTimeMillis = now.subtract(7, 'day').valueOf();
   const endTimeMillis = now.valueOf();
   const datasetId = `${startTimeMillis * 1_000_000}-${endTimeMillis * 1_000_000}`;
 
+  // Default sleep data source ID
   const dataSourceId = 'derived:com.google.sleep.segment:com.google.android.gms:merged';
 
+  // Sleep stage mapping
   const sleepStageMap = {
     1: 'Awake',
     2: 'Sleep',
@@ -381,19 +374,36 @@ app.get('/sleep', authCheck, async (req, res) => {
   };
 
   try {
+    // 1. Check available data sources for sleep
+    const sources = await fitness.users.dataSources.list({ userId: 'me' });
+    const sleepSources = sources.data.dataSource.filter(s => s.dataType.name.includes("sleep"));
+    
+    if (sleepSources.length === 0) {
+      return res.status(404).send("No sleep data sources available.");
+    }
+
+    // Log to ensure sleep data source is being detected
+    console.log("Available sleep data sources:", sleepSources.map(s => s.dataStreamId));
+
+    // 2. Fetch sleep data from the dataSource
     const response = await fitness.users.dataSources.datasets.get({
       userId: 'me',
-      dataSourceId,
-      datasetId,
+      dataSourceId: dataSourceId,
+      datasetId: datasetId,
     });
 
+    // 3. Process sleep data points
     const points = response.data.point || [];
 
+    if (points.length === 0) {
+      return res.status(404).send("No sleep data available for the selected period.");
+    }
+
     const stages = points.map(point => {
-      const start = dayjs(Number(point.startTimeNanos) / 1e6);
-      const end = dayjs(Number(point.endTimeNanos) / 1e6);
+      const start = dayjs(Number(point.startTimeNanos) / 1e6);  // Convert nanoseconds to milliseconds
+      const end = dayjs(Number(point.endTimeNanos) / 1e6);  // Convert nanoseconds to milliseconds
       const duration = end.diff(start, 'minute');
-      const stage = point.value[0].intVal;
+      const stage = point.value?.[0]?.intVal ?? null;
 
       return {
         start: start.format('YYYY-MM-DD HH:mm:ss'),
@@ -404,6 +414,7 @@ app.get('/sleep', authCheck, async (req, res) => {
       };
     });
 
+    // 4. Calculate total sleep time (light sleep, deep sleep, REM, etc.)
     const totalSleepMinutes = stages
       .filter(s => [2, 4, 5, 6].includes(s.stageCode))
       .reduce((sum, s) => sum + s.durationMinutes, 0);
@@ -411,6 +422,7 @@ app.get('/sleep', authCheck, async (req, res) => {
     const hours = Math.floor(totalSleepMinutes / 60);
     const minutes = totalSleepMinutes % 60;
 
+    // 5. Respond with total sleep data and stages
     res.json({
       totalSleep: { hours, minutes },
       stages,
@@ -418,14 +430,18 @@ app.get('/sleep', authCheck, async (req, res) => {
 
   } catch (error) {
     console.error('Failed to fetch detailed sleep data:', error.response?.data || error);
+
+    // Handle error more precisely based on the error's structure
+    if (error.response && error.response.data) {
+      console.error('Error Details:', error.response.data);
+    }
+
     res.status(500).send('Failed to fetch sleep segment data');
   }
 });
 
 // Step 5: Fetch Step Count Data
 app.get('/steps', authCheck, async (req, res) => {
-  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
-  oAuth2Client.setCredentials(global.oauthTokens);
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
@@ -482,7 +498,7 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
 
   const dayjs = require('dayjs');
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const startTime = now.subtract(2, 'day').valueOf() * 1_000_000;
   const endTime = now.valueOf() * 1_000_000;
   const dataset = `${startTime}-${endTime}`;
 
@@ -511,12 +527,10 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
 
 // Step 8: Fetch Body Temperature Data
 app.get('/body-temperature', authCheck, async (req, res) => {
-  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
-  oAuth2Client.setCredentials(global.oauthTokens);
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
   const now = dayjs();
-  const startTime = now.subtract(1, 'day').valueOf() * 1_000_000;
+  const startTime = now.subtract(2, 'day').valueOf() * 1_000_000;
   const endTime = now.valueOf() * 1_000_000;
 
   const dataset = `${startTime}-${endTime}`;
