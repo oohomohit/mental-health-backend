@@ -516,16 +516,16 @@ app.get('/activity', authCheck, async (req, res) => {
 // Step 7: Fetch Breathing Rate/ Oxygen Saturation Data
 app.get('/oxygen-saturation', authCheck, async (req, res) => {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
-
   const dayjs = require('dayjs');
   const now = dayjs();
-  const startTime = now.subtract(2, 'day').valueOf() * 1_000_000;
+  const startTime = now.subtract(7, 'day').valueOf() * 1_000_000;
   const endTime = now.valueOf() * 1_000_000;
   const dataset = `${startTime}-${endTime}`;
-
   const dataSourceId = 'derived:com.google.oxygen_saturation:com.google.android.gms:merged';
 
   try {
+    const sources = await fitness.users.dataSources.list({ userId: 'me' });
+
     const response = await fitness.users.dataSources.datasets.get({
       userId: 'me',
       dataSourceId,
@@ -534,12 +534,26 @@ app.get('/oxygen-saturation', authCheck, async (req, res) => {
 
     const points = response.data.point || [];
 
+    if (points.length === 0) {
+      return res.status(404).send('No oxygen saturation data available for the selected period.');
+    }
+
     const data = points.map(point => ({
-      timestamp: point.startTimeNanos,
-      oxygenSaturation: point.value?.[0]?.fpVal ?? null
+      timestamp: dayjs(Number(point.startTimeNanos) / 1e6).format('YYYY-MM-DD HH:mm:ss'),
+      oxygenSaturation: point.value?.[0]?.fpVal ?? null,
     })).filter(p => p.oxygenSaturation !== null);
 
-    res.json(data);
+    if (data.length === 0) {
+      return res.status(404).send('No valid oxygen saturation data available.');
+    }
+
+    const averageOxygenSaturation = data.reduce((sum, p) => sum + p.oxygenSaturation, 0) / data.length;
+
+    res.json({
+      averageOxygenSaturation: averageOxygenSaturation.toFixed(2),
+      data: data,
+    });
+
   } catch (error) {
     console.error('Failed to fetch oxygen saturation:', error);
     res.status(500).send('Oxygen Saturation: Failed to fetch data');
