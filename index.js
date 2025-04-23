@@ -50,7 +50,9 @@ const SCOPES = [
   'https://www.googleapis.com/auth/fitness.activity.read',
   'https://www.googleapis.com/auth/fitness.body.read',
   'https://www.googleapis.com/auth/fitness.body_temperature.read',
-  'https://www.googleapis.com/auth/fitness.oxygen_saturation.read'
+  'https://www.googleapis.com/auth/fitness.oxygen_saturation.read',
+  'https://www.googleapis.com/auth/userinfo.profile',
+   'https://www.googleapis.com/auth/userinfo.email'
 ];
 
 
