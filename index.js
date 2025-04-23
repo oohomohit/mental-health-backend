@@ -356,13 +356,20 @@ app.get('/heart-rate', authCheck, async (req, res) => {
 
 // Step 4: Fetch Sleep Duration data
 app.get('/sleep', authCheck, async (req, res) => {
-  if (!global.oauthTokens) return res.status(401).send('User not authenticated');
+  if (!global.oauthTokens) {
+    return res.status(401).send('User not authenticated');
+  }
+
   oAuth2Client.setCredentials(global.oauthTokens);
 
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+
   const now = dayjs();
   const startTimeMillis = now.subtract(1, 'day').valueOf();
   const endTimeMillis = now.valueOf();
+  const datasetId = `${startTimeMillis * 1_000_000}-${endTimeMillis * 1_000_000}`;
+
+  const dataSourceId = 'derived:com.google.sleep.segment:com.google.android.gms:merged';
 
   const sleepStageMap = {
     1: 'Awake',
@@ -374,77 +381,44 @@ app.get('/sleep', authCheck, async (req, res) => {
   };
 
   try {
-    // Step 1: Retrieve sleep sessions
-    const sessionsResponse = await fitness.users.sessions.list({
+    const response = await fitness.users.dataSources.datasets.get({
       userId: 'me',
-      startTime: new Date(startTimeMillis).toISOString(),
-      endTime: new Date(endTimeMillis).toISOString(),
-      activityType: 72
+      dataSourceId,
+      datasetId,
     });
 
-    const sessions = sessionsResponse.data.session || [];
+    const points = response.data.point || [];
 
-    if (sessions.length === 0) {
-      console.warn('No sleep sessions found for the past day.');
-      return res.json({
-        totalSleep: { hours: 0, minutes: 0 },
-        stages: [],
-        message: 'No sleep data available for the past 24 hours.'
-      });
-    }
+    const stages = points.map(point => {
+      const start = dayjs(Number(point.startTimeNanos) / 1e6);
+      const end = dayjs(Number(point.endTimeNanos) / 1e6);
+      const duration = end.diff(start, 'minute');
+      const stage = point.value[0].intVal;
 
-    let totalSleepMinutes = 0;
-    const allStages = [];
+      return {
+        start: start.format('YYYY-MM-DD HH:mm:ss'),
+        end: end.format('YYYY-MM-DD HH:mm:ss'),
+        durationMinutes: duration,
+        stageCode: stage,
+        stage: sleepStageMap[stage] || 'Unknown',
+      };
+    });
 
-    // Step 2: For each session, retrieve detailed sleep stages
-    for (const session of sessions) {
-      const startTime = Number(session.startTimeMillis);
-      const endTime = Number(session.endTimeMillis);
-      const datasetId = `${startTime * 1e6}-${endTime * 1e6}`;
-
-      try {
-        const dataResponse = await fitness.users.dataSources.datasets.get({
-          userId: 'me',
-          dataSourceId: 'derived:com.google.sleep.segment:com.google.android.gms:merged',
-          datasetId
-        });
-
-        const points = dataResponse.data.point || [];
-
-        const stages = points.map(point => {
-          const start = dayjs(Number(point.startTimeNanos) / 1e6);
-          const end = dayjs(Number(point.endTimeNanos) / 1e6);
-          const duration = end.diff(start, 'minute');
-          const stage = point.value?.[0]?.intVal ?? 0;
-
-          return {
-            start: start.format('YYYY-MM-DD HH:mm:ss'),
-            end: end.format('YYYY-MM-DD HH:mm:ss'),
-            durationMinutes: duration,
-            stageCode: stage,
-            stage: sleepStageMap[stage] || 'Unknown'
-          };
-        });
-
-        const sleepStages = stages.filter(s => [2, 4, 5, 6].includes(s.stageCode));
-        const sessionSleepMinutes = sleepStages.reduce((sum, s) => sum + s.durationMinutes, 0);
-        totalSleepMinutes += sessionSleepMinutes;
-        allStages.push(...stages);
-      } catch (error) {
-        console.error(`Failed to fetch sleep stages for session ${session.id}:`, error.response?.data || error);
-      }
-    }
+    const totalSleepMinutes = stages
+      .filter(s => [2, 4, 5, 6].includes(s.stageCode))
+      .reduce((sum, s) => sum + s.durationMinutes, 0);
 
     const hours = Math.floor(totalSleepMinutes / 60);
     const minutes = totalSleepMinutes % 60;
 
     res.json({
       totalSleep: { hours, minutes },
-      stages: allStages
+      stages,
     });
+
   } catch (error) {
-    console.error('Failed to fetch sleep data:', error.response?.data || error);
-    res.status(500).send('Failed to fetch sleep data');
+    console.error('Failed to fetch detailed sleep data:', error.response?.data || error);
+    res.status(500).send('Failed to fetch sleep segment data');
   }
 });
 
