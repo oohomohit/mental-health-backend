@@ -294,10 +294,15 @@ app.get('/auth/google', (req, res) => {
 
 // Step 2: Handle OAuth callback
 app.get('/auth/google/callback', async (req, res) => {
-  const code = req.query.code;
   try {
+    const code = req.query.code;
     const { tokens } = await oAuth2Client.getToken(code);
     oAuth2Client.setCredentials(tokens);
+
+    const oauth2 = google.oauth2({
+      auth: oAuth2Client,
+      version: 'v2',
+    });
 
     const { data: profile } = await oauth2.userinfo.get();
     const userEmail = profile.email;
