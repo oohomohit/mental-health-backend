@@ -628,6 +628,7 @@ app.get('/dashboard', authCheck, async (req, res) => {
     const { hours: sleepHours, minutes: sleepMinutes } = sleepData.totalSleep;
 
     const dashboardData = {
+      email: userEmail,
       heartRateAvg: cleanData(heartRateData.average),
       totalSteps: cleanData(stepsData.totalSteps),
       sleepDuration: cleanData(`${sleepHours} hr ${sleepMinutes} min`),
