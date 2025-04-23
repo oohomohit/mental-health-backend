@@ -89,47 +89,71 @@ async function getHeartRateData() {
 // Fetch sleep data
 async function getSleepData() {
   const fitness = google.fitness({ version: 'v1', auth: oAuth2Client });
+  const dayjs = require('dayjs');
   const now = dayjs();
-  const startTimeMillis = now.subtract(1, 'day').valueOf();
+
+  // Define start and end time for querying the last 7 days (adjustable)
+  const startTimeMillis = now.subtract(7, 'day').valueOf();
   const endTimeMillis = now.valueOf();
+  const datasetId = `${startTimeMillis * 1_000_000}-${endTimeMillis * 1_000_000}`;
+
+  // Default sleep data source ID
+  const dataSourceId = 'derived:com.google.sleep.segment:com.google.android.gms:merged';
+
+  // Sleep stage mapping
+  const sleepStageMap = {
+    1: 'Awake',
+    2: 'Sleep',
+    3: 'Out of Bed',
+    4: 'Light Sleep',
+    5: 'Deep Sleep',
+    6: 'REM Sleep'
+  };
 
   try {
-    const response = await fitness.users.sessions.list({
+    // Fetch sleep data from the dataSource
+    const response = await fitness.users.dataSources.datasets.get({
       userId: 'me',
-      startTime: new Date(startTimeMillis).toISOString(),
-      endTime: new Date(endTimeMillis).toISOString(),
+      dataSourceId: dataSourceId,
+      datasetId: datasetId,
     });
 
-    const sessions = response.data.session || [];
+    // Process sleep data points
+    const points = response.data.point || [];
 
-    const sleepSessions = sessions
-      .filter(session =>
-        session.activityType === 72 &&
-        session.startTimeMillis &&
-        session.endTimeMillis &&
-        Number(session.endTimeMillis) > Number(session.startTimeMillis)
-      );
+    if (points.length === 0) {
+      throw new Error("No sleep data available for the selected period.");
+    }
 
-    const parsedSessions = sleepSessions.map(session => {
-      const start = dayjs(Number(session.startTimeMillis));
-      const end = dayjs(Number(session.endTimeMillis));
+    const stages = points.map(point => {
+      const start = dayjs(Number(point.startTimeNanos) / 1e6);  // Convert nanoseconds to milliseconds
+      const end = dayjs(Number(point.endTimeNanos) / 1e6);  // Convert nanoseconds to milliseconds
+      const duration = end.diff(start, 'minute');
+      const stage = point.value?.[0]?.intVal ?? null;
+
       return {
         start: start.format('YYYY-MM-DD HH:mm:ss'),
         end: end.format('YYYY-MM-DD HH:mm:ss'),
-        durationMinutes: end.diff(start, 'minute'),
+        durationMinutes: duration,
+        stageCode: stage,
+        stage: sleepStageMap[stage] || 'Unknown',
       };
     });
 
-    const totalSleepMinutes = parsedSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+    // Calculate total sleep time (light sleep, deep sleep, REM, etc.)
+    const totalSleepMinutes = stages
+      .filter(s => [2, 4, 5, 6].includes(s.stageCode))  // Only count sleep stages
+      .reduce((sum, s) => sum + s.durationMinutes, 0);
+
     const hours = Math.floor(totalSleepMinutes / 60);
     const minutes = totalSleepMinutes % 60;
 
+    // Return total sleep time
     return {
       totalSleep: { hours, minutes },
-      sessions: parsedSessions,
     };
   } catch (error) {
-    console.error('Error fetching sleep data:', error.response?.data || error);
+    console.error('Error fetching sleep data:', error);
     throw new Error('Failed to fetch sleep data');
   }
 }
@@ -381,9 +405,6 @@ app.get('/sleep', authCheck, async (req, res) => {
     if (sleepSources.length === 0) {
       return res.status(404).send("No sleep data sources available.");
     }
-
-    // Log to ensure sleep data source is being detected
-    console.log("Available sleep data sources:", sleepSources.map(s => s.dataStreamId));
 
     // 2. Fetch sleep data from the dataSource
     const response = await fitness.users.dataSources.datasets.get({
